@@ -1,0 +1,69 @@
+# Local Python environments and downloaded development tools
+.venv/
+venv/
+env/
+.tools/
+
+# Python, test, and analysis caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# SQLite databases and their WAL, SHM, and journal sidecars, at any depth
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Local test runs and temporary files
+.test-tmp/
+test_temp/
+.tmp/
+tmp/
+temp/
+pytest-of-*/
+*.tmp
+*.temp
+
+# Credentials and machine-local environment files
+.env
+.env.*
+.envrc
+.envrc.*
+.streamlit/secrets.toml
+secrets.toml
+secrets.json
+credentials
+credentials.*
+.secrets/
+secrets/
+.aws/
+.ssh/
+.git-credentials
+.netrc
+_netrc
+.pypirc
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Build outputs, editor settings, and logs
+build/
+dist/
+*.egg-info/
+.idea/
+.vscode/
+*.log

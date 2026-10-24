@@ -1,0 +1,9 @@
+[project]
+name = "maintainai"
+version = "0.1.0"
+description = "Local industrial equipment maintenance tracker with synthetic demo data"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

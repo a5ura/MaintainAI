@@ -1,0 +1,6 @@
+equipment_asset_tag,description,priority,status,reporter,created_at,troubleshooting_notes,root_cause,corrective_action
+DEMO-ABB-001,Synthetic demo: intermittent position alarm during dry cycle,High,Open,Demo technician Alex,2026-01-12T09:00:00Z,Collected synthetic alarm log,,
+DEMO-VAC-001,Synthetic demo: vacuum drops while holding a test part,Critical,In Progress,Demo technician Sam,2026-01-13T11:30:00Z,Inspected synthetic hose and seal,,
+DEMO-ZAB-001,Synthetic demo: gantry homing offset after restart,Medium,Resolved,Demo engineer Morgan,2026-01-14T14:15:00Z,Compared synthetic homing positions,Synthetic loose reference bracket,Secured demo bracket and repeated test cycle
+DEMO-CON-001,Synthetic demo: belt tracking drift during unloaded test,Low,Closed,Demo technician Alex,2026-01-15T10:00:00Z,Inspected synthetic belt alignment,Synthetic idler misalignment,Adjusted demo idler and verified tracking
+DEMO-VIS-001,Synthetic demo: inconsistent image brightness,High,Open,Demo engineer Morgan,2026-01-16T08:45:00Z,Checked synthetic lighting configuration,,

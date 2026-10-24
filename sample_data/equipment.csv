@@ -1,0 +1,6 @@
+asset_tag,name,category,manufacturer,model,location,operational_status
+DEMO-ABB-001,ABB robotic arm,Robotics,ABB,Synthetic robot model,Demo assembly cell A,Operational
+DEMO-VAC-001,Vacuum gripper,End effector,Synthetic supplier,Synthetic vacuum tool,Demo assembly cell A,Maintenance
+DEMO-ZAB-001,Zaber gantry,Motion system,Zaber,Synthetic XYZ gantry,Demo inspection cell,Operational
+DEMO-CON-001,Conveyor,Material handling,Synthetic supplier,Synthetic belt conveyor,Demo transfer line,Operational
+DEMO-VIS-001,Machine vision station,Inspection,Synthetic supplier,Synthetic camera station,Demo inspection cell,Offline
