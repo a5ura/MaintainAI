@@ -1,6 +1,6 @@
 # MaintainAI
 
-An open-source industrial equipment maintenance tracker and the first baseline for a future AI intelligence platform. This version runs locally with Python 3.11+, Streamlit, SQLite, and pandas. It requires no API keys, paid services, GPU, or external database.
+An open-source industrial equipment maintenance tracker with **v0.2A semantic issue search**, extending the v0.1 baseline. It runs locally with Python 3.11+, Streamlit, SQLite, pandas, NumPy, and Sentence Transformers. It requires no API keys, paid services, GPU, or external database. A public embedding model is downloaded on first use; ticket embedding and retrieval then run locally on CPU.
 
 **Synthetic demo data:** all bundled assets, equipment models, locations, incidents, people, findings, and corrective actions are invented for this portfolio project. ABB and Zaber are example manufacturer names; this project is not affiliated with either company. Demo records are not manufacturer maintenance guidance.
 
@@ -12,7 +12,10 @@ An open-source industrial equipment maintenance tracker and the first baseline f
 - Updates to issue status, troubleshooting notes, root cause, and corrective action.
 - Equipment maintenance history and dashboard counts, status charts, and category statistics.
 - SQLite persistence, repeatable synthetic seeding, and validated, atomic equipment/issue CSV imports.
-- pytest coverage of core operations, persistence, import failures, and Streamlit user flows.
+- **Similar Issues:** describe a maintenance problem and retrieve up to five related issues with cosine scores, equipment names, findings, corrective actions, and original issue references.
+- Explicit index rebuild/refresh with stale-index detection after ticket creation, edits, or CSV imports.
+- Twenty synthetic example tickets across five equipment types, including fifteen additional robotics maintenance cases in v0.2A.
+- pytest coverage of core operations, persistence, import failures, semantic retrieval, index freshness, and Streamlit user flows without model downloads.
 
 ## Run on Windows PowerShell
 
@@ -22,6 +25,7 @@ Prerequisite: install Python 3.11 or newer with the Windows Python launcher. The
 Set-Location 'C:\path\to\MaintainAI'
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install "torch>=2.2,<3" --index-url https://download.pytorch.org/whl/cpu
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m scripts.seed
 .\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider --basetemp .test-tmp\pytest
@@ -29,6 +33,8 @@ py -3.11 -m venv .venv
 ```
 
 Open **http://localhost:8501** after the server starts. Stop it with **Ctrl+C**. The commands call the environment's Python directly, so PowerShell script activation and execution-policy changes are unnecessary. The included Streamlit configuration binds the server to this computer's loopback interface and disables Streamlit usage statistics.
+
+The explicit PyTorch installation selects the [official CPU wheel index](https://download.pytorch.org/whl/cpu/torch/). The application also sets `device="cpu"` for model loading and encoding. Installation needs internet access and downloads larger packages than v0.1, but no CUDA toolkit or GPU is required. Running the app and using the original maintenance pages does not load or download the embedding model.
 
 If `py -3.11` is unavailable and this working copy contains the optional project-local Python provisioned during development, you can use that interpreter instead:
 
@@ -46,7 +52,7 @@ From the project folder, after installing the requirements:
 .\.venv\Scripts\python.exe -m pytest -ra -p no:cacheprovider --basetemp .test-tmp\pytest
 ```
 
-`--basetemp` keeps pytest fixture files in the ignored project-local `.test-tmp` directory. pytest clears the selected base directory when it needs it, so reserve `.test-tmp\pytest` for disposable test output. `-p no:cacheprovider` disables pytest's cache plugin. Tests use separate databases and do not modify `data/maintainai.db`. Streamlit interaction tests use AppTest; they do not constitute a manual browser review.
+`--basetemp` keeps pytest fixture files in the ignored project-local `.test-tmp` directory. pytest clears the selected base directory when it needs it, so reserve `.test-tmp\pytest` for disposable test output. `-p no:cacheprovider` disables pytest's cache plugin. Tests use separate databases and do not modify `data/maintainai.db`. Semantic tests use deterministic fake embeddings or mocked model constructors; an automatic fixture blocks real model loading. No model download is needed for routine tests. Streamlit interaction tests use AppTest; they do not constitute a manual browser review.
 
 ## Using the app
 
@@ -54,11 +60,54 @@ From the project folder, after installing the requirements:
 2. Browse or register assets under **Equipment**. Equipment condition is maintained separately from issue status.
 3. Use **Create issue** to report an issue, then **Issues** to filter, review, and record the investigation and fix.
 4. Use **Equipment history** for all related issues, including troubleshooting notes and corrective actions.
-5. Use **Dashboard** for overall totals. **Open issues** includes `Open` and `In Progress`; **Closed issues** includes `Resolved` and `Closed`. A fresh seed has 5 assets and 5 issues: 3 open and 2 closed.
+5. Use **Dashboard** for overall totals. **Open issues** includes `Open` and `In Progress`; **Closed issues** includes `Resolved` and `Closed`. A fresh v0.2A seed has 5 assets and 20 issues: 3 open and 17 closed.
+6. Use **Similar Issues** to rebuild the local search index and search by meaning rather than exact description text.
 
 All timestamps are stored and displayed in UTC. `created_at` stays fixed when an issue is edited; `updated_at` changes on each save. Status changes are unrestricted, allowing an issue to be reopened. Notes are current editable fields, not an append-only audit log. At the service level, a status-only update preserves existing findings; explicitly passing empty text clears a field.
 
-Equipment CRUD is **partial**: registration, listing, viewing, and condition updates are implemented. Editing other equipment fields and deleting equipment are not implemented in v0.1.
+Equipment CRUD remains **partial**: registration, listing, viewing, and condition updates are implemented. Editing other equipment fields and deleting equipment are not implemented in this version.
+
+## Semantic search (v0.2A)
+
+The model is [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2), an Apache-2.0 licensed English sentence encoder. It produces 384-dimensional embeddings. This implementation pins model revision `1110a243fdf4706b3f48f1d95db1a4f5529b4d41`, uses safetensors weights, disables remote model code, and requires no Hugging Face account or token.
+
+Each issue's description, troubleshooting notes, root cause, and corrective action are encoded separately when nonempty, including the equipment name for context. Their normalized vectors are averaged and normalized into one vector per issue. This ensures that a long description cannot displace every other field from the model input. Long individual fields and queries are still subject to the model's [256 word-piece input limit](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2#intended-uses).
+
+SQLite stores little-endian float32 vectors with the original issue ID, equipment ID, dimension, and content hash in `issue_embeddings`. `semantic_index_metadata` records the pinned model/pooling identity, ticket snapshot fingerprint, issue count, and rebuild timestamp. These are additive tables: the existing registry and issue schema/data are preserved. The embedding adapter, SQLite index storage, and retrieval service have separate boundaries for a future vector database. Search normalizes vectors and uses NumPy dot products to compute cosine similarity.
+
+**Index freshness:** choose **Rebuild / refresh search index** after loading examples, creating/importing tickets, or editing tickets. All issue statuses are included. Each search checks the current ticket snapshot, stored row identities/content, and model identity. Missing, changed, or invalid embeddings block search until a rebuild. Changes during embedding generation abort publication of the new index; checks after query inference detect edits during model loading. Rebuilds atomically replace derived search data only and never rewrite tickets or equipment. Result lists are not cached across Streamlit reruns. As with any interactive app, changes made after a response is displayed become visible on the next interaction or page refresh.
+
+### First model download and offline use
+
+The first rebuild downloads model files from Hugging Face into `.cache/sentence-transformers/` inside the project (ignored by Git). Expect network transfer of roughly 90 MB of model weights plus small configuration/tokenizer files and a delay for initial loading. The initialized model is reused within the server process. Ticket text is passed to local CPU inference, not an external inference API. Network access is used to retrieve/check model files; Hugging Face telemetry is disabled by default by the adapter.
+
+On Windows, Hugging Face may warn that symlinks are unavailable and store copies instead; this still works and can use more disk space. Administrator privileges are not required to run the application. An unauthenticated-download warning also does not mean a paid account or token is required.
+
+After caching the model, force local-file-only loading before starting Streamlit:
+
+```powershell
+$env:MAINTAINAI_MODEL_OFFLINE = '1'
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+Remove this setting with `Remove-Item Env:MAINTAINAI_MODEL_OFFLINE` if you need to download the model again. Offline mode with an incomplete cache produces a helpful model-loading error. A missing dependency, failed download, or failed inference leaves existing maintenance data and the previous index intact.
+
+### Manual verification
+
+1. Start Streamlit, then select **Load synthetic demo data** in the sidebar. Loading it again should add no duplicate records. On a fresh database, the dashboard should show **5 equipment / 20 issues / 3 open / 17 closed**. An existing user database may have additional tickets or edited statuses.
+2. Open **Similar Issues**, then choose **Rebuild / refresh search index**. Allow the first model download to finish. The index should report current with 20 indexed issues on a fresh seed.
+3. Enter `Vacuum gripper loses suction and drops parts during transfer` and select **Find similar issues**. Inspect up to five ranked matches, their cosine scores, equipment names, descriptions, notes, root causes, corrective actions, and original issue IDs.
+4. Try `Gantry cannot complete homing because the limit switch stays active`, `Conveyor motor overload with a jammed roller`, and `Camera images are blurry and out of focus`. Related equipment examples should rank near the top; exact rankings/scores are not acceptance guarantees for every environment.
+5. In **Issues**, select a returned issue number and edit its root cause or corrective action. Reopen **Similar Issues**: a stale-index message should appear, search should be disabled, and the earlier result list should be absent. Rebuild, then search again and confirm the new text is displayed.
+6. Create a new issue or import valid issue CSV rows. Confirm search again requires a refresh. Rebuild twice and verify dashboard totals and ticket IDs do not change.
+
+### Limitations
+
+- Cosine scores range from -1 to 1 and are similarity measures, not calibrated confidence, diagnostic certainty, or validated maintenance advice. The top five can include unrelated tickets when the dataset has no good match; there is no relevance cutoff or reranker.
+- The general English model is not trained on this application's industrial data. Acronyms, uncommon fault codes, long fields, and subtle equipment differences can reduce relevance. Field averaging can dilute individual findings.
+- A full refresh recomputes the corpus; vectors are scanned in memory with NumPy. This suits a local portfolio dataset, not a large shared production deployment.
+- Model and dependency downloads require network access initially. The first inference can take time on CPU. Package ranges are bounded but not fully locked.
+- Ticket edits use the existing last-write-wins behavior. Search freshness is a snapshot guarantee, not live background synchronization or automatic indexing.
 
 ## Data and seeding
 
@@ -70,7 +119,7 @@ Seed again safely at any time:
 .\.venv\Scripts\python.exe -m scripts.seed
 ```
 
-The seed adds missing equipment by asset tag and missing demo issues by stable seed key. It preserves existing equipment, user-created issues, and edits to demo issues; it never resets the database. Asset tags use SQLite's `NOCASE` rules: ASCII letters are case-insensitive, while non-ASCII characters are compared exactly. CSV imports use the same matching rules. Both files are seeded in one transaction.
+The seed adds missing equipment by asset tag and missing demo issues by stable seed key. The first five CSV rows and their existing keys are unchanged from v0.1; fifteen new rows are appended. Seeding an already seeded v0.1 database adds only those missing examples. It preserves existing equipment, user-created issues, and edits to demo issues; it never resets the database. Seed keys derive from fixture row position, so keep existing example rows in their original order when extending the file. Asset tags use SQLite's `NOCASE` rules: ASCII letters are case-insensitive, while non-ASCII characters are compared exactly. CSV imports use the same matching rules. Both files are seeded in one transaction. Seeding does not download a model or build the search index.
 
 To use another database, set the same environment variable for both the CLI and app:
 
@@ -111,6 +160,9 @@ MaintainAI/
 │   ├── service.py             # Validation, registry, issues, filters, statistics
 │   ├── csv_import.py          # CSV parsing, row errors, atomic batch import
 │   ├── seed.py                # Repeatable synthetic demo loading
+│   ├── embeddings.py          # Lazy CPU MiniLM adapter and embedder protocol
+│   ├── semantic_search.py     # SQLite vector index, freshness, cosine retrieval
+│   ├── semantic_ui.py         # Similar Issues page
 │   └── ui.py                  # Streamlit pages and pandas tables/charts
 ├── scripts/seed.py            # Seed CLI
 ├── sample_data/               # Synthetic equipment and issue CSVs
@@ -130,7 +182,7 @@ The `.gitignore` excludes virtual environments, downloaded local tools, SQLite f
 
 ## Scope
 
-This is a local portfolio prototype without authentication, role permissions, attachments, migrations, an audit trail, or production deployment hardening. Concurrent edits use last-write-wins behavior. Do not expose a shared deployment to untrusted users without adding access control. No LLM, RAG, agent, MCP, telemetry integration, or external service call is implemented in the application. Those features can be added incrementally after this baseline.
+This is a local portfolio prototype without authentication, role permissions, attachments, a general migration framework, an audit trail, or production deployment hardening. Concurrent edits use last-write-wins behavior. Do not expose a shared deployment to untrusted users without adding access control. v0.2A adds a local embedding encoder and retrieval only. No external LLM, RAG generation, agent, or MCP integration is implemented. The only model-related network operation is downloading/checking public model artifacts; offline mode avoids that after caching.
 
 ## License
 

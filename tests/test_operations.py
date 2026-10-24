@@ -147,7 +147,7 @@ def test_database_constraints_enforce_relationships(store, equipment_id):
 
 
 def test_repeatable_seed_preserves_edited_and_user_data(store):
-    assert seed_demo(store.connection) == {"equipment_added": 5, "issues_added": 5}
+    assert seed_demo(store.connection) == {"equipment_added": 5, "issues_added": 20}
     equipment = store.list_equipment()
     assert {item["name"] for item in equipment} == {"ABB robotic arm", "Vacuum gripper", "Zaber gantry", "Conveyor", "Machine vision station"}
     issue_id = store.list_issues()[0]["id"]
@@ -155,7 +155,7 @@ def test_repeatable_seed_preserves_edited_and_user_data(store):
     store.create_issue(equipment_id=equipment[0]["id"], description="User issue", reporter="User")
     assert seed_demo(store.connection) == {"equipment_added": 0, "issues_added": 0}
     assert store.get_issue(issue_id)["root_cause"] == "User edited this"
-    assert store.dashboard()["total_issues"] == 6
+    assert store.dashboard()["total_issues"] == 21
 
 
 def test_seed_transaction_rolls_back_if_fixture_is_invalid(store, tmp_path):

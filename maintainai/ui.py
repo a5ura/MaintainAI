@@ -6,9 +6,10 @@ import streamlit as st
 from maintainai.csv_import import CSVImportError, import_csv
 from maintainai.database import default_db_path
 from maintainai.seed import SAMPLE_DIR, seed_demo
+from maintainai.semantic_ui import similar_issues_page
 from maintainai.service import EQUIPMENT_STATUSES, ISSUE_STATUSES, PRIORITIES, MaintenanceStore, ValidationError
 
-PAGES = ("Dashboard", "Equipment", "Create issue", "Issues", "Equipment history", "CSV import")
+PAGES = ("Dashboard", "Equipment", "Create issue", "Issues", "Equipment history", "CSV import", "Similar Issues")
 
 
 def table(records: list[dict], columns: list[str]) -> None:
@@ -51,6 +52,7 @@ def render(store: MaintenanceStore) -> None:
         "Issues": issues_page,
         "Equipment history": history_page,
         "CSV import": import_page,
+        "Similar Issues": similar_issues_page,
     }[page](store)
 
 

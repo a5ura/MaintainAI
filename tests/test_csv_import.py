@@ -9,9 +9,9 @@ ISSUE_HEADER = "equipment_asset_tag,description,priority,status,reporter\n"
 
 def test_sample_files_import_in_order(store):
     assert import_csv(store, (SAMPLE_DIR / "equipment.csv").read_bytes(), "equipment") == 5
-    assert import_csv(store, (SAMPLE_DIR / "issues.csv").read_bytes(), "issues") == 5
+    assert import_csv(store, (SAMPLE_DIR / "issues.csv").read_bytes(), "issues") == 20
     assert store.dashboard()["open_issues"] == 3
-    assert store.dashboard()["closed_issues"] == 2
+    assert store.dashboard()["closed_issues"] == 17
 
 
 def test_bom_quoted_commas_and_blank_optional_defaults(store):
