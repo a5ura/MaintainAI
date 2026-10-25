@@ -1,7 +1,7 @@
 [project]
 name = "maintainai"
-version = "0.1.0"
-description = "Local industrial equipment maintenance tracker with synthetic demo data"
+version = "0.2.0b1"
+description = "Local equipment maintenance with semantic search and an advisory RAG troubleshooting assistant"
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]

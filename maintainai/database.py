@@ -61,4 +61,19 @@ def initialize(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_issues_equipment ON issues(equipment_id);
         CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
+        CREATE TABLE IF NOT EXISTS issue_embeddings (
+            issue_id INTEGER PRIMARY KEY REFERENCES issues(id) ON DELETE CASCADE,
+            equipment_id INTEGER NOT NULL REFERENCES equipment(id),
+            content_hash TEXT NOT NULL,
+            dimension INTEGER NOT NULL CHECK(dimension > 0),
+            vector BLOB NOT NULL CHECK(length(vector) = dimension * 4)
+        );
+        CREATE TABLE IF NOT EXISTS semantic_index_metadata (
+            id INTEGER PRIMARY KEY CHECK(id = 1),
+            model_key TEXT NOT NULL,
+            source_signature TEXT NOT NULL,
+            dimension INTEGER NOT NULL CHECK(dimension > 0),
+            issue_count INTEGER NOT NULL CHECK(issue_count >= 0),
+            built_at TEXT NOT NULL
+        );
     """)

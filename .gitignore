@@ -12,6 +12,13 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .hypothesis/
+
+# Downloaded model weights, including files outside the normal .cache directory
+*.safetensors
+*.onnx
+*.pt
+*.pth
+pytorch_model*.bin
 .coverage
 .coverage.*
 coverage.xml
