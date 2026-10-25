@@ -18,9 +18,9 @@ def test_empty_dashboard_and_demo_loader(tmp_path, monkeypatch):
     assert [metric.value for metric in app.metric] == ["0", "0", "0", "0"]
     find(app.button, "Load synthetic demo data").click().run()
     assert not app.exception
-    assert [metric.value for metric in app.metric] == ["5", "5", "3", "2"]
+    assert [metric.value for metric in app.metric] == ["5", "20", "3", "17"]
     find(app.button, "Load synthetic demo data").click().run()
-    assert [metric.value for metric in app.metric] == ["5", "5", "3", "2"]
+    assert [metric.value for metric in app.metric] == ["5", "20", "3", "17"]
     for page in PAGES:
         find(app.radio, "Navigate").set_value(page).run()
         assert not app.exception, page
