@@ -1,0 +1,8 @@
+﻿equipment_asset_tag,timestamp,severity,event_code,message,source
+DEMO-ABB-001,2026-10-25T09:15:00Z,INFO,CYCLE_START,Robot pick and place cycle started,ABB Robot Controller
+DEMO-ABB-001,2026-10-25T09:15:12Z,WARNING,PRESSURE_LOW,Gripper pneumatic pressure below expected threshold,ABB Robot Controller
+DEMO-ABB-001,2026-10-25T09:15:15Z,ERROR,PICK_FAIL,Component pickup failed during gripping operation,ABB Robot Controller
+DEMO-ABB-001,2026-10-25T09:15:18Z,ERROR,PICK_FAIL,Repeated pickup failure detected,ABB Robot Controller
+DEMO-ABB-001,2026-10-25T09:16:00Z,INFO,INSPECTION_START,Operator initiated pneumatic system inspection,Operator HMI
+DEMO-ABB-001,2026-10-25T09:18:30Z,WARNING,LEAK_SUSPECTED,Possible pneumatic leak detected during inspection,Operator HMI
+DEMO-ABB-001,2026-10-25T09:22:00Z,INFO,MAINTENANCE_EVENT,Maintenance intervention recorded,Maintenance System

@@ -4,24 +4,69 @@ from dataclasses import dataclass, field
 import json
 import math
 import os
+import re
 from typing import Protocol
 from urllib.parse import urlsplit
 
 import requests
 
+from maintainai.database import PROJECT_ROOT
+
 MAX_RESPONSE_BYTES = 128 * 1024
+_LLM_ENV_NAMES = frozenset("MAINTAINAI_LLM_" + name for name in (
+    "ENDPOINT", "MODEL", "API_KEY", "TIMEOUT_SECONDS", "MAX_TOKENS", "TOKEN_PARAMETER", "JSON_MODE",
+))
 
 
 class ProviderError(RuntimeError):
     """Sanitized provider failure; never include request headers or response bodies."""
 
-    def __init__(self, code: str, message: str):
+    def __init__(self, code: str, message: str, *, missing_variables: tuple[str, ...] = ()):
         self.code = code
+        self.missing_variables = missing_variables
         super().__init__(message)
 
 
 class LLMProvider(Protocol):
     def generate(self, messages: list[dict[str, str]]) -> str: ...
+
+
+def _local_llm_settings() -> dict[str, str]:
+    """Read literal, single-line project-root .env settings without changing os.environ.
+
+Support comments, optional export prefixes, and matching single/double quotes.
+Backslashes and dollar signs stay literal; no interpolation, escape processing,
+multiline values, shell execution, or logging of file contents occurs.
+"""
+    try:
+        content = (PROJECT_ROOT / ".env").read_text(encoding="utf-8-sig")
+    except FileNotFoundError:
+        return {}
+    except (OSError, UnicodeError):
+        raise ProviderError("configuration", "Could not read the project-root .env file. Check file permissions and UTF-8 encoding.") from None
+    settings = {}
+    for number, line in enumerate(content.splitlines(), start=1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        name, separator, raw_value = line.partition("=")
+        name, value = name.strip(), raw_value.strip()
+        if not separator:
+            raise ProviderError("configuration", f"Invalid project-root .env syntax at line {number}. Use one NAME=VALUE per line.")
+        if name not in _LLM_ENV_NAMES:
+            continue
+        if value.startswith(("'", '"')):
+            closing = value.find(value[0], 1)
+            if closing < 0 or (value[closing + 1:].strip() and not value[closing + 1:].strip().startswith("#")):
+                raise ProviderError("configuration", f"Invalid project-root .env quoting at line {number}. Use matching quotes around a single-line value.")
+            value = value[1:closing]
+        else:
+            # A comment requires preceding whitespace; embedded # remains literal.
+            value = re.split(r"\s+#", raw_value, maxsplit=1)[0].strip()
+        settings[name] = value
+    return settings
 
 
 @dataclass(frozen=True)
@@ -57,19 +102,56 @@ class LLMConfig:
 
     @classmethod
     def from_environment(cls):
-        values = {name: os.environ.get(f"MAINTAINAI_LLM_{name}", "").strip() for name in ("ENDPOINT", "MODEL", "API_KEY")}
-        if not all(values.values()):
-            raise ProviderError("configuration", "Cloud mode requires MAINTAINAI_LLM_ENDPOINT, MAINTAINAI_LLM_MODEL, and MAINTAINAI_LLM_API_KEY. Retrieval-only mode needs no LLM credentials.")
+        # Process values, including explicit empty values, override the optional
+        # local file. Keep file settings out of the global process environment.
+        environment = _local_llm_settings()
+        environment.update({name: os.environ[name] for name in _LLM_ENV_NAMES if name in os.environ})
+        values = {name: environment.get(f"MAINTAINAI_LLM_{name}", "").strip() for name in ("ENDPOINT", "MODEL", "API_KEY")}
+        missing = tuple(f"MAINTAINAI_LLM_{name}" for name, value in values.items() if not value)
+        if missing:
+            raise ProviderError("configuration", "Cloud mode requires MAINTAINAI_LLM_ENDPOINT, MAINTAINAI_LLM_MODEL, and MAINTAINAI_LLM_API_KEY. Retrieval-only mode needs no LLM credentials.",
+                                missing_variables=missing)
         try:
-            timeout = float(os.environ.get("MAINTAINAI_LLM_TIMEOUT_SECONDS", "30"))
-            tokens = int(os.environ.get("MAINTAINAI_LLM_MAX_TOKENS", "1000"))
-            json_mode = os.environ.get("MAINTAINAI_LLM_JSON_MODE", "1")
+            timeout = float(environment.get("MAINTAINAI_LLM_TIMEOUT_SECONDS", "30"))
+            tokens = int(environment.get("MAINTAINAI_LLM_MAX_TOKENS", "1000"))
+            json_mode = environment.get("MAINTAINAI_LLM_JSON_MODE", "1")
             if json_mode not in ("0", "1"):
                 raise ValueError("Invalid JSON mode")
         except ValueError:
             raise ProviderError("configuration", "Invalid LLM timeout, output-token limit, or JSON-mode setting.") from None
         return cls(values["ENDPOINT"], values["MODEL"], values["API_KEY"], timeout, tokens, json_mode == "1",
-                   os.environ.get("MAINTAINAI_LLM_TOKEN_PARAMETER", "max_tokens"))
+                   environment.get("MAINTAINAI_LLM_TOKEN_PARAMETER", "max_tokens"))
+
+
+@dataclass(frozen=True)
+class LLMConfigStatus:
+    """Safe display data only; never retain a config object or credential details."""
+
+    status: str
+    model: str | None = None
+    missing_variables: tuple[str, ...] = ()
+    message: str = ""
+
+
+def get_llm_config_status() -> LLMConfigStatus:
+    """Validate merged local settings without initializing or contacting a provider."""
+    try:
+        config = LLMConfig.from_environment()
+    except ProviderError as exc:
+        if exc.missing_variables:
+            return LLMConfigStatus("Not configured", missing_variables=exc.missing_variables,
+                                   message="Set the missing variables in the project-root .env file or process environment. Process environment values take precedence.")
+        # Status rendering must never surface exception text, raw settings, or
+        # credentials, including text from a future configuration error source.
+        return LLMConfigStatus("Invalid configuration", message=(
+            "Check project-root .env syntax, UTF-8 encoding and file permissions, then review the "
+            "endpoint, model, credentials, timeout and token settings against README.md. "
+            "Process environment values take precedence over .env."
+        ))
+    # A credential accidentally pasted into the model field must not be displayed.
+    model = config.model if config.api_key not in config.model else "(hidden: credential found in model field)"
+    return LLMConfigStatus("Configured", model=model,
+                           message="Provider connectivity, credential validity and model availability are not verified.")
 
 
 class ChatCompletionsProvider:

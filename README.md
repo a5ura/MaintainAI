@@ -84,7 +84,7 @@ Install the requirements, load demo data, and rebuild the semantic index. Open *
 
 ### Optional cloud configuration in Windows PowerShell
 
-Use an endpoint/account you are authorized to use. Set variables in the same PowerShell session that launches Streamlit. There is **no default cloud endpoint, model, or API key**. Choose a provider offering an OpenAI-style [chat-completions API](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) with bearer authentication. The application uses `requests`; no vendor SDK is required.
+Use an endpoint/account you are authorized to use. Set variables in the same PowerShell session that launches Streamlit, or use the optional project-root `.env` file described below for persistence across new terminals. There is **no default cloud endpoint, model, or API key**. Choose a provider offering an OpenAI-style [chat-completions API](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) with bearer authentication. The application uses `requests`; no vendor SDK is required.
 
 ```powershell
 Set-Location 'C:\path\to\MaintainAI'
@@ -96,7 +96,23 @@ $env:MAINTAINAI_LLM_MAX_TOKENS = '1000'
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-Replace the example endpoint/model with values from your provider. The hidden key prompt avoids putting the key literal in PowerShell history. Keys exist in the launched process environment and HTTP authorization header; they are never included in prompts or intentionally logged/persisted by this application. After stopping Streamlit, clear the key with `Remove-Item Env:MAINTAINAI_LLM_API_KEY -ErrorAction SilentlyContinue`. `.env` files are ignored by Git but are **not automatically loaded**; no dotenv dependency is added. Never paste credentials into tickets, questions, screenshots, source files, or commits.
+Replace the example endpoint/model with values from your provider. The hidden key prompt avoids putting the key literal in PowerShell history. Keys are used only for provider configuration and the HTTP authorization header; they are never included in prompts or intentionally logged by this application. After stopping Streamlit, clear a process key with `Remove-Item Env:MAINTAINAI_LLM_API_KEY -ErrorAction SilentlyContinue`. Never paste credentials into tickets, questions, screenshots, source files, or commits.
+
+For persistent local settings, copy the credential-free `.env.example` once and edit the resulting `.env` locally. The template contains the requested Gemini-compatible full endpoint and model name; confirm model availability with your provider. Its API key is deliberately empty. These commands preserve an existing `.env`:
+
+```powershell
+Set-Location 'C:\path\to\MaintainAI'
+if (-not (Test-Path -LiteralPath .env)) {
+    Copy-Item -LiteralPath .env.example -Destination .env
+}
+notepad .env
+# Fill in MAINTAINAI_LLM_API_KEY in the local editor, save as UTF-8, then close it.
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+`.env` contains plaintext credentials: keep it private and local. It and other local environment files remain Git-ignored; only `.env.example` is eligible for version control. The loader resolves `.env` beside `app.py` using the installed project path, independently of the working directory. It reads only the seven LLM settings in the table below, lazily when cloud configuration is requested. Every explicit process environment value, including an empty value, takes precedence. File values are not exported into `os.environ`. Use a new terminal or remove stale process overrides if they mask file edits. Restart Streamlit after editing local configuration.
+
+The standard-library reader supports UTF-8 (with an optional BOM), single-line `NAME=VALUE` entries, optional matching quotes, `export` prefixes, blank lines, and `#` comments. Inline comments on unquoted values require preceding whitespace. Values are literal: there is no variable interpolation, backslash escape processing, multiline syntax, or command execution. Missing files preserve environment-only operation; missing keys, invalid settings, unreadable files, or malformed entries produce sanitized configuration errors and the existing local fallback. Loading configuration makes no network request and does not grant cloud consent. No new dependency is required.
 
 | Variable | Behavior |
 | --- | --- |
@@ -107,6 +123,8 @@ Replace the example endpoint/model with values from your provider. The hidden ke
 | `MAINTAINAI_LLM_MAX_TOKENS` | Output-token request limit, 128–4096; default 1000. Not a monetary spending cap. |
 | `MAINTAINAI_LLM_JSON_MODE` | `1` (default) sends `response_format: {"type":"json_object"}`. Set `0` if your endpoint does not support that option; local JSON/schema validation still applies. |
 | `MAINTAINAI_LLM_TOKEN_PARAMETER` | `max_tokens` (default), or `max_completion_tokens` for compatible endpoints/models that require it. |
+
+The sidebar shows **Cloud AI Configuration** beneath the database controls on startup and across navigation. **Configured** means the existing local validation passed and displays the model name; provider connectivity, credential validity, and model availability remain unverified. **Not configured** lists only the missing required variable names. **Invalid configuration** gives safe instructions to check the file and settings without showing their values. This status uses the same project-root `.env` and process-environment precedence as inference, makes no network request, and never grants cloud consent or displays credential values or fragments.
 
 The thin provider supports a single nonstreaming text completion. Endpoints requiring different authentication, URL query parameters, tools, multimodal output, or vendor-specific fields need a future adapter. Redirects are rejected; TLS verification stays enabled. Environment proxies and netrc credentials are not inherited. There are no automatic retries or background requests. An intentional new submission is a new request and may be billable.
 
