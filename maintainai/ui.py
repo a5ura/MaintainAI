@@ -4,13 +4,16 @@ import pandas as pd
 import streamlit as st
 
 from maintainai.csv_import import CSVImportError, import_csv
+from maintainai.log_ui import equipment_logs_page
+from maintainai.llm_ui import cloud_configuration_status
+from maintainai.fault_ui import fault_analysis_page
 from maintainai.database import default_db_path
 from maintainai.seed import SAMPLE_DIR, seed_demo
 from maintainai.semantic_ui import similar_issues_page
 from maintainai.rag_ui import troubleshooting_page
 from maintainai.service import EQUIPMENT_STATUSES, ISSUE_STATUSES, PRIORITIES, MaintenanceStore, ValidationError
 
-PAGES = ("Dashboard", "Equipment", "Create issue", "Issues", "Equipment history", "CSV import", "Similar Issues", "AI Troubleshooting Assistant")
+PAGES = ("Dashboard", "Equipment", "Create issue", "Issues", "Equipment history", "CSV import", "Similar Issues", "AI Troubleshooting Assistant", "Equipment Logs", "Fault Analysis")
 
 
 def table(records: list[dict], columns: list[str]) -> None:
@@ -43,6 +46,7 @@ def render(store: MaintenanceStore) -> None:
             result = seed_demo(store.connection)
             saved(f"Synthetic demo data loaded: {result['equipment_added']} equipment and {result['issues_added']} issues added. Existing data was preserved.")
         st.caption("Run this loader again safely; existing demo records are preserved.")
+        cloud_configuration_status()
     if "flash" in st.session_state:
         st.success(st.session_state.pop("flash"))
     st.header(page)
@@ -55,6 +59,8 @@ def render(store: MaintenanceStore) -> None:
         "CSV import": import_page,
         "Similar Issues": similar_issues_page,
         "AI Troubleshooting Assistant": troubleshooting_page,
+        "Equipment Logs": equipment_logs_page,
+        "Fault Analysis": fault_analysis_page,
     }[page](store)
 
 

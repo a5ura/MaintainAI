@@ -45,6 +45,7 @@ pytest-of-*/
 # Credentials and machine-local environment files
 .env
 .env.*
+!/.env.example
 .envrc
 .envrc.*
 .streamlit/secrets.toml
@@ -74,3 +75,6 @@ dist/
 .idea/
 .vscode/
 *.log
+
+# Local debugging outputs
+/outputs/

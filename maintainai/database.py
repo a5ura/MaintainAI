@@ -76,4 +76,22 @@ def initialize(connection: sqlite3.Connection) -> None:
             issue_count INTEGER NOT NULL CHECK(issue_count >= 0),
             built_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS equipment_logs (
+            id INTEGER PRIMARY KEY,
+            equipment_id INTEGER NOT NULL REFERENCES equipment(id),
+            timestamp TEXT NOT NULL,
+            severity TEXT NOT NULL
+                CHECK(severity IN ('INFO', 'WARNING', 'ERROR', 'CRITICAL')),
+            event_code TEXT NOT NULL DEFAULT '',
+            message TEXT NOT NULL CHECK(length(trim(message)) > 0),
+            source TEXT NOT NULL DEFAULT '',
+            imported_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_equipment_logs_equipment_time
+            ON equipment_logs(equipment_id, timestamp DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_equipment_logs_severity
+            ON equipment_logs(severity);
     """)

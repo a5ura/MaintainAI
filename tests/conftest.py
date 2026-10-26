@@ -9,6 +9,12 @@ from maintainai.service import MaintenanceStore
 
 
 @pytest.fixture(autouse=True)
+def isolate_local_llm_settings(tmp_path, monkeypatch):
+    """Never read a developer's real project-root .env, even in cloud fallback tests."""
+    monkeypatch.setattr("maintainai.llm.PROJECT_ROOT", tmp_path)
+
+
+@pytest.fixture(autouse=True)
 def block_cloud_network(monkeypatch):
     """Never use a developer's real credentials or make unmocked HTTP calls in tests."""
     for name in list(os.environ):

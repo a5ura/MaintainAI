@@ -8,6 +8,7 @@ PRIORITIES = ("Low", "Medium", "High", "Critical")
 ISSUE_STATUSES = ("Open", "In Progress", "Resolved", "Closed")
 EQUIPMENT_STATUSES = ("Operational", "Maintenance", "Offline")
 ACTIVE_STATUSES = ("Open", "In Progress")
+LOG_SEVERITIES = ('INFO', 'WARNING', 'ERROR', 'CRITICAL')
 
 
 class ValidationError(ValueError):
@@ -37,7 +38,7 @@ def choice(value: Any, field: str, options: tuple[str, ...]) -> str:
     return value
 
 
-def timestamp(value: str | None = None) -> str:
+def timestamp(value: str | None = None, *, field: str = "created_at") -> str:
     if value is None or value == "":
         return utc_now()
     try:
@@ -46,7 +47,7 @@ def timestamp(value: str | None = None) -> str:
             raise ValueError("missing timezone")
         return parsed.astimezone(timezone.utc).isoformat(timespec="microseconds")
     except (ValueError, TypeError, AttributeError, OverflowError) as exc:
-        raise ValidationError("created_at must be an ISO 8601 timestamp with a timezone and a UTC date within years 1 through 9999, e.g. 2026-01-15T09:00:00Z.") from exc
+        raise ValidationError(f"{field} must be an ISO 8601 timestamp with a timezone and a UTC date within years 1 through 9999, e.g. 2026-01-15T09:00:00Z.") from exc
 
 
 def validate_equipment(record: dict) -> dict:
@@ -73,6 +74,24 @@ def validate_issue(record: dict) -> dict:
     return result
 
 
+def validate_log(record: dict) -> dict:
+    """Validate an equipment event without inventing a missing event timestamp."""
+    equipment_id = record.get("equipment_id")
+    if type(equipment_id) is not int or equipment_id <= 0:
+        raise ValidationError("equipment_id must be a positive integer.")
+    event_timestamp = clean_text(record.get("timestamp"), "timestamp", required=True)
+    result = {
+        "equipment_id": equipment_id,
+        "timestamp": timestamp(event_timestamp, field="timestamp"),
+        "severity": choice(record.get("severity"), "severity", LOG_SEVERITIES),
+        "message": clean_text(record.get("message"), "message", required=True, limit=10000),
+        "event_code": clean_text(record.get("event_code"), "event_code", limit=200),
+        "source": clean_text(record.get("source"), "source", limit=200),
+    }
+    result["imported_at"] = utc_now()
+    return result
+
+
 EQUIPMENT_INSERT = """INSERT INTO equipment
     (asset_tag, name, category, manufacturer, model, location, operational_status, created_at)
     VALUES (:asset_tag, :name, :category, :manufacturer, :model, :location, :operational_status, :created_at)"""
@@ -81,6 +100,9 @@ ISSUE_INSERT = """INSERT INTO issues
      troubleshooting_notes, root_cause, corrective_action)
     VALUES (:equipment_id, :description, :priority, :status, :reporter, :created_at, :updated_at,
             :troubleshooting_notes, :root_cause, :corrective_action)"""
+LOG_INSERT = """INSERT INTO equipment_logs
+    (equipment_id, timestamp, severity, event_code, message, source, imported_at)
+    VALUES (:equipment_id, :timestamp, :severity, :event_code, :message, :source, :imported_at)"""
 
 
 class MaintenanceStore:
@@ -119,6 +141,41 @@ class MaintenanceStore:
                 return [self.connection.execute(ISSUE_INSERT, record).lastrowid for record in validated]
         except sqlite3.IntegrityError as exc:
             raise ValidationError("Issue import failed database validation. No issues were imported.") from exc
+
+    def create_log(self, **record: Any) -> int:
+        return self.import_log_records([record])[0]
+
+    def import_log_records(self, records: list[dict]) -> list[int]:
+        validated = [validate_log(record) for record in records]
+        try:
+            with self.connection:
+                for equipment_id in dict.fromkeys(record["equipment_id"] for record in validated):
+                    self.get_equipment(equipment_id)
+                return [self.connection.execute(LOG_INSERT, record).lastrowid for record in validated]
+        except sqlite3.IntegrityError as exc:
+            raise ValidationError(
+                "Equipment log import failed database integrity checks. Verify that referenced equipment "
+                "still exists and log fields meet the table constraints. No logs were imported."
+            ) from exc
+
+    def list_logs(self, equipment_id: int | None = None, severity: str | None = None) -> list[dict]:
+        conditions, params = [], []
+        if equipment_id is not None:
+            if type(equipment_id) is not int or equipment_id <= 0:
+                raise ValidationError("equipment_id must be a positive integer.")
+            self.get_equipment(equipment_id)
+            conditions.append("l.equipment_id = ?")
+            params.append(equipment_id)
+        if severity is not None:
+            choice(severity, "severity", LOG_SEVERITIES)
+            conditions.append("l.severity = ?")
+            params.append(severity)
+        query = """SELECT l.*, e.asset_tag, e.name AS equipment_name FROM equipment_logs l
+                   JOIN equipment e ON e.id = l.equipment_id"""
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY l.timestamp DESC, l.id DESC"
+        return [dict(row) for row in self.connection.execute(query, params)]
 
     def list_issues(self, *, equipment_id: int | None = None, status: str | None = None, priority: str | None = None, search: str = "") -> list[dict]:
         conditions, params = [], []
