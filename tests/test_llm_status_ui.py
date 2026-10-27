@@ -32,8 +32,9 @@ def sidebar_test_app():
 def harness(tmp_path, monkeypatch):
     monkeypatch.setenv("MAINTAINAI_DB_PATH", str(tmp_path / "unused.db"))
     handlers = {}
-    for name in ("dashboard", "equipment_page", "create_issue_page", "issues_page", "history_page",
-                 "import_page", "similar_issues_page", "troubleshooting_page", "equipment_logs_page", "fault_analysis_page"):
+    for name in ("home_page", "dashboard", "equipment_page", "create_issue_page", "issues_page", "history_page",
+                 "import_page", "similar_issues_page", "troubleshooting_page", "equipment_logs_page", "fault_analysis_page",
+                 "guided_troubleshooting_page"):
         def page(store, page_name=name):
             st.text("Synthetic page: " + page_name)
         handlers[name] = Mock(side_effect=page)

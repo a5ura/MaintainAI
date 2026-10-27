@@ -1,3 +1,4 @@
+import pytest
 from streamlit.testing.v1 import AppTest
 
 from maintainai.database import PROJECT_ROOT, connect, initialize
@@ -10,10 +11,56 @@ def find(elements, label):
     return next(element for element in elements if element.label == label)
 
 
+def test_home_is_default_and_preserves_sidebar_routes(tmp_path, monkeypatch):
+    monkeypatch.setenv("MAINTAINAI_DB_PATH", str(tmp_path / "home.db"))
+    app = AppTest.from_file(str(PROJECT_ROOT / "app.py"), default_timeout=15).run()
+    assert not app.exception
+    navigation = find(app.sidebar.radio, "Navigate")
+    assert navigation.value == "Home"
+    assert navigation.options == [
+        "Home", "Dashboard", "Equipment", "Create issue", "Issues", "Equipment history",
+        "CSV import", "Similar Issues", "AI Troubleshooting Assistant", "Equipment Logs", "Fault Analysis",
+        "Guided Troubleshooting",
+    ]
+    assert any(item.value == "What would you like to do?" for item in app.subheader)
+    assert find(app.button, "Troubleshoot a Problem")
+    assert find(app.button, "Create a Ticket")
+    app.run()
+    assert not app.exception
+    assert find(app.sidebar.radio, "Navigate").value == "Home"
+
+
+@pytest.mark.parametrize("button, destination, expected_field", [
+    ("Troubleshoot a Problem", "Guided Troubleshooting", "Problem description *"),
+    ("Create a Ticket", "Create issue", "Description *"),
+])
+def test_home_actions_navigate_and_sidebar_returns_home(tmp_path, monkeypatch, button, destination, expected_field):
+    path = tmp_path / "home_actions.db"
+    monkeypatch.setenv("MAINTAINAI_DB_PATH", str(path))
+    with connect(path) as connection:
+        initialize(connection)
+        seed_demo(connection)
+    app = AppTest.from_file(str(PROJECT_ROOT / "app.py"), default_timeout=15).run()
+    find(app.button, button).click().run()
+    assert not app.exception
+    assert find(app.sidebar.radio, "Navigate").value == destination
+    assert any(item.value == destination for item in app.header)
+    assert find(app.text_area, expected_field)
+    app.run()
+    assert not app.exception
+    assert find(app.sidebar.radio, "Navigate").value == destination
+    find(app.sidebar.radio, "Navigate").set_value("Home").run()
+    assert not app.exception
+    assert any(item.value == "What would you like to do?" for item in app.subheader)
+    assert find(app.button, "Troubleshoot a Problem")
+    assert find(app.button, "Create a Ticket")
+
+
 def test_empty_dashboard_and_demo_loader(tmp_path, monkeypatch):
     path = tmp_path / "app.db"
     monkeypatch.setenv("MAINTAINAI_DB_PATH", str(path))
     app = AppTest.from_file(str(PROJECT_ROOT / "app.py"), default_timeout=15).run()
+    find(app.radio, "Navigate").set_value("Dashboard").run()
     assert not app.exception
     assert [metric.value for metric in app.metric] == ["0", "0", "0", "0"]
     find(app.button, "Load synthetic demo data").click().run()
@@ -24,6 +71,7 @@ def test_empty_dashboard_and_demo_loader(tmp_path, monkeypatch):
     for page in PAGES:
         find(app.radio, "Navigate").set_value(page).run()
         assert not app.exception, page
+        assert any(item.value == page for item in app.header)
 
 
 def test_create_and_close_issue_through_ui(tmp_path, monkeypatch):

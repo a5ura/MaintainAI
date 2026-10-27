@@ -42,11 +42,14 @@ class MiniLMEmbedder:
     model_key = MODEL_KEY
     dimension = MODEL_DIMENSION
 
+    def __init__(self, *, offline: bool | None = None):
+        self.offline = offline
+
     def encode(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.empty((0, self.dimension), dtype=np.float32)
         cache_folder = str(PROJECT_ROOT / ".cache" / "sentence-transformers")
-        offline = os.environ.get("MAINTAINAI_MODEL_OFFLINE") == "1"
+        offline = self.offline if self.offline is not None else os.environ.get("MAINTAINAI_MODEL_OFFLINE") == "1"
         try:
             model = _load_model(cache_folder, offline)
             return model.encode(
