@@ -308,3 +308,17 @@ def test_model_load_failure_is_actionable(monkeypatch):
     monkeypatch.setattr("maintainai.embeddings._load_model", fail)
     with pytest.raises(EmbeddingError, match="first rebuild needs internet"):
         MiniLMEmbedder().encode(["Fault"])
+
+
+@pytest.mark.parametrize("configured_offline", ["0", "1"])
+def test_explicit_offline_embedder_uses_cached_weights_without_changing_global_settings(monkeypatch, configured_offline):
+    import os
+
+    monkeypatch.setenv("MAINTAINAI_MODEL_OFFLINE", configured_offline)
+    model = Mock()
+    model.encode.return_value = np.ones((1, MODEL_DIMENSION), dtype=np.float32)
+    loader = Mock(return_value=model)
+    monkeypatch.setattr("maintainai.embeddings._load_model", loader)
+    MiniLMEmbedder(offline=True).encode(["Synthetic problem"])
+    assert loader.call_args.args[1] is True
+    assert os.environ["MAINTAINAI_MODEL_OFFLINE"] == configured_offline

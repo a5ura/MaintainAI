@@ -80,6 +80,24 @@ def _historical_records(matches: list[dict] | None) -> list[dict]:
     return records
 
 
+def prepare_historical_records(matches: list[dict] | None) -> list[dict]:
+    """Normalize up to five ranked historical records without retrieval or inference."""
+    return _historical_records(matches)
+
+
+def prepare_log_record(log: dict, equipment_id: int) -> dict:
+    """Allowlist and bound one supplied event, never inventing an event timestamp."""
+    message = clean_text(log.get("message"), "Log message", required=True)
+    return {
+        "id": log["id"], "equipment_id": equipment_id,
+        "timestamp": _event_time(log.get("timestamp"), "Log timestamp"),
+        "severity": choice(log.get("severity"), "Log severity", LOG_SEVERITIES),
+        "event_code": clean_text(log.get("event_code"), "Log event_code", limit=200),
+        "message": message[:MAX_FIELD_CHARS],
+        "truncated_fields": ["message"] if len(message) > MAX_FIELD_CHARS else [],
+    }
+
+
 def build_fault_context(finding: dict, logs: list[dict] | None,
                         matches: list[dict] | None) -> dict:
     """Prepare allowlisted, bounded evidence without persisting it or using inference.
@@ -100,15 +118,7 @@ Reported finding metadata is separated from the underlying observed log records.
     observations = []
     for log_id in selected:
         log = by_id[log_id]
-        message = clean_text(log.get("message"), "Log message", required=True)
-        observations.append({
-            "id": log_id, "equipment_id": finding["equipment_id"],
-            "timestamp": _event_time(log.get("timestamp"), "Log timestamp"),
-            "severity": choice(log.get("severity"), "Log severity", LOG_SEVERITIES),
-            "event_code": clean_text(log.get("event_code"), "Log event_code", limit=200),
-            "message": message[:MAX_FIELD_CHARS],
-            "truncated_fields": ["message"] if len(message) > MAX_FIELD_CHARS else [],
-        })
+        observations.append(prepare_log_record(log, finding["equipment_id"]))
     first = by_id[selected[0]] if selected else {}
     start = _event_time(finding.get("start_timestamp"), "Fault start_timestamp")
     end = _event_time(finding.get("end_timestamp"), "Fault end_timestamp")

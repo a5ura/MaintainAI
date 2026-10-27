@@ -7,13 +7,14 @@ from maintainai.csv_import import CSVImportError, import_csv
 from maintainai.log_ui import equipment_logs_page
 from maintainai.llm_ui import cloud_configuration_status
 from maintainai.fault_ui import fault_analysis_page
+from maintainai.guided_ui import guided_troubleshooting_page
 from maintainai.database import default_db_path
 from maintainai.seed import SAMPLE_DIR, seed_demo
 from maintainai.semantic_ui import similar_issues_page
 from maintainai.rag_ui import troubleshooting_page
 from maintainai.service import EQUIPMENT_STATUSES, ISSUE_STATUSES, PRIORITIES, MaintenanceStore, ValidationError
 
-PAGES = ("Dashboard", "Equipment", "Create issue", "Issues", "Equipment history", "CSV import", "Similar Issues", "AI Troubleshooting Assistant", "Equipment Logs", "Fault Analysis")
+PAGES = ("Home", "Dashboard", "Equipment", "Create issue", "Issues", "Equipment history", "CSV import", "Similar Issues", "AI Troubleshooting Assistant", "Equipment Logs", "Fault Analysis", "Guided Troubleshooting")
 
 
 def table(records: list[dict], columns: list[str]) -> None:
@@ -39,7 +40,7 @@ def equipment_selector(equipment: list[dict], *, label: str = "Equipment", key: 
 def render(store: MaintenanceStore) -> None:
     with st.sidebar:
         st.header("Workspace")
-        page = st.radio("Navigate", PAGES)
+        page = st.radio("Navigate", PAGES, key="navigation")
         st.caption("Database")
         st.code(str(default_db_path()), language=None)
         if st.button("Load synthetic demo data", use_container_width=True):
@@ -51,6 +52,7 @@ def render(store: MaintenanceStore) -> None:
         st.success(st.session_state.pop("flash"))
     st.header(page)
     {
+        "Home": home_page,
         "Dashboard": dashboard,
         "Equipment": equipment_page,
         "Create issue": create_issue_page,
@@ -61,7 +63,27 @@ def render(store: MaintenanceStore) -> None:
         "AI Troubleshooting Assistant": troubleshooting_page,
         "Equipment Logs": equipment_logs_page,
         "Fault Analysis": fault_analysis_page,
+        "Guided Troubleshooting": guided_troubleshooting_page,
     }[page](store)
+
+
+def _navigate_to(page: str) -> None:
+    st.session_state["navigation"] = page
+
+
+def home_page(store: MaintenanceStore) -> None:
+    st.subheader("What would you like to do?")
+    left, right = st.columns(2)
+    with left:
+        st.subheader("Troubleshoot a Problem")
+        st.write("Explore maintenance history for guidance on an equipment problem.")
+        st.button("Troubleshoot a Problem", type="primary", use_container_width=True,
+                  on_click=_navigate_to, args=("Guided Troubleshooting",))
+    with right:
+        st.subheader("Create a Ticket")
+        st.write("Record an equipment issue so your team can track and resolve it.")
+        st.button("Create a Ticket", type="primary", use_container_width=True,
+                  on_click=_navigate_to, args=("Create issue",))
 
 
 def dashboard(store: MaintenanceStore) -> None:

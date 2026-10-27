@@ -70,6 +70,31 @@ All timestamps are stored and displayed in UTC. `created_at` stays fixed when an
 
 Equipment CRUD remains **partial**: registration, listing, viewing, and condition updates are implemented. Editing other equipment fields and deleting equipment are not implemented in this version.
 
+## Guided Troubleshooting
+
+After the setup above, start the app with the existing command:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+1. Open **Home → Troubleshoot a Problem** (also available as **Guided Troubleshooting** in the sidebar).
+2. Enter the technician's problem description, optionally select registered equipment, and click **Analyze Problem** to save the session draft.
+3. Optionally click **Analyze Stored Logs** for the submitted equipment. Stored events are analyzed only after this explicit action. No detected pattern does not establish that equipment is healthy.
+4. Prepare a fresh index under **Similar Issues → Rebuild / refresh search index**, then return and click **Find Similar Maintenance Issues**. Guided retrieval uses cached local embedding weights; the first rebuild may download the model. Up to five historical issues are retrieved from the selected equipment, or globally when none is selected.
+5. Review **Exact provider messages**, including system instructions and supplied evidence, which may contain sensitive maintenance data. With current historical matches available, give explicit consent using the checkbox, then click **Generate AI Troubleshooting**. Previewing or consenting alone sends no request. There are no automatic retries; provider or validation failures show retrieval-only evidence. No historical matches means no provider request.
+
+**Advisory only:** AI recommendations are unverified hypotheses. Historical fixes and temporal log patterns do not establish a current diagnosis. Qualified personnel must verify recommendations using approved site and manufacturer procedures before any work.
+
+After logs change, repeat **Analyze Stored Logs**, then **Find Similar Maintenance Issues**. After ticket changes, rebuild the index before finding matches again. Resubmit changed descriptions or equipment with **Analyze Problem**. Changed evidence and explicit analysis/retrieval refreshes revoke earlier consent: review the new preview, consent again, and explicitly generate again. Evidence changes detected during a request discard the response.
+
+Gemini is optional; local analysis and retrieval need no cloud key. Follow the existing [cloud configuration instructions](#optional-cloud-configuration-in-windows-powershell). Keep provider settings and credentials in private environment variables or the Git-ignored local `.env`, never in repository files or problem descriptions.
+
+### Guided smoke tests
+
+- **Description-only:** load synthetic demo data and prepare the index. Leave equipment unselected, submit `Vacuum gripper loses suction while transferring a part`, then find similar issues. Confirm global search scope, historical matches, no log citations in the preview, and no provider request without consent and an explicit generation click.
+- **Equipment + stored logs:** select registered equipment with synthetic warning/error events (import under **Equipment Logs** if needed), submit a matching description, then analyze logs and find similar issues. Confirm equipment-scoped history and supplied log evidence. With an optionally configured provider, consent and generate once; accepted recommendations must cite both issue and log IDs. Change the logs and confirm generation requires fresh analysis, matches, and consent.
+
 ## AI Troubleshooting Assistant (v0.2B)
 
 **Advisory only. Recommendations require qualified human verification before any safety-critical maintenance or operation. Follow approved site and manufacturer procedures.** The assistant cannot change equipment states, close tickets, run shell commands, or execute physical robot commands. It has no agents, MCP integration, tool calling, or autonomous actions.
