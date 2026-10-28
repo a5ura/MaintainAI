@@ -1,40 +1,64 @@
 # MaintainAI
 
-An open-source industrial equipment maintenance tracker with **v0.2B advisory RAG troubleshooting**, built on v0.2A semantic search and the v0.1 maintenance baseline. It runs with Python 3.11+, Streamlit, SQLite, pandas, NumPy, and Sentence Transformers. Local search, retrieval-only troubleshooting, and automated tests require no paid subscription, LLM API key, GPU, or external database. Optional cloud generation uses your chosen chat-completions endpoint and may incur provider charges. A public embedding model is downloaded on first use; embedding inference runs locally on CPU.
+MaintainAI is an open-source, AI-assisted industrial maintenance and troubleshooting application. Engineers can track equipment issues, record investigations, search past maintenance incidents, and examine stored robot logs alongside historical evidence. It is a local portfolio prototype for equipment reliability, engineering troubleshooting, maintenance operations, and robotics deployment support.
+
+Built with Python 3.11+, Streamlit, SQLite, pandas, NumPy, and Sentence Transformers, it combines local sentence embeddings with optional advisory retrieval-augmented generation (RAG). **The local demo needs no cloud API key, paid subscription, GPU, or external database.** Initial dependency installation and embedding-model setup require internet access; cached embeddings run locally on CPU. Optional cloud generation requires explicit consent and may incur provider charges.
 
 **Synthetic demo data:** all bundled assets, equipment models, locations, incidents, people, findings, and corrective actions are invented for this portfolio project. ABB and Zaber are example manufacturer names; this project is not affiliated with either company. Demo records are not manufacturer maintenance guidance.
 
 ## Features
 
 - Equipment registry with asset tags, categories, manufacturers, models, locations, and condition. Includes an ABB robotic arm, vacuum gripper, Zaber gantry, conveyor, and machine vision station.
-- Issue creation with equipment, description, priority, status, reporter, and automatic UTC timestamps.
-- Issue filtering by equipment, priority, status, and literal text search across description and reporter.
-- Updates to issue status, troubleshooting notes, root cause, and corrective action.
+- Maintenance tickets with equipment, description, priority, status, reporter, UTC timestamps, troubleshooting notes, root cause, and corrective action. Filter by equipment, status, priority, or literal description/reporter text.
 - Equipment maintenance history and dashboard counts, status charts, and category statistics.
-- SQLite persistence, repeatable synthetic seeding, and validated, atomic equipment/issue CSV imports.
-- **Similar Issues:** describe a maintenance problem and retrieve up to five related issues with cosine scores, equipment names, findings, corrective actions, and original issue references.
-- Explicit index rebuild/refresh with stale-index detection after ticket creation, edits, or CSV imports.
-- Twenty synthetic example tickets across five equipment types, including fifteen additional robotics maintenance cases in v0.2A.
-- **AI Troubleshooting Assistant:** optional equipment-scoped retrieval, structured advisory hypotheses, server-validated source ticket IDs, and a no-key retrieval-only default.
-- Configurable cloud chat-completions provider with environment-only credentials, bounded requests, and retrieval-only fallback on provider or validation errors.
-- pytest coverage of core operations, persistence, import failures, semantic retrieval, index freshness, and Streamlit user flows without model downloads.
+- SQLite persistence, repeatable synthetic seeding, and validated, atomic equipment/issue/log CSV imports. Fixtures include 5 equipment records, 20 maintenance issues, and 7 robot-log events; logs are imported separately.
+- **Similar Issues:** local sentence embeddings retrieve up to five historical issues with original IDs, findings, and cosine similarity scores. Explicit index refresh and stale-index checks protect against outdated ticket evidence; scores are not diagnostic confidence.
+- **Equipment Logs** and **Fault Analysis:** browse imported events, identify repeated failures and warning-to-error patterns, and retrieve related historical incidents. Findings are deterministic temporal correlations with supporting log IDs.
+- **Guided Troubleshooting:** combine a technician report, optional equipment-scoped log analysis, and historical issue retrieval. Evidence provenance, exact provider-message previews, freshness checks, and citation safeguards keep recorded observations separate from generated hypotheses.
+- **AI Troubleshooting Assistant:** retrieval-only by default, with optional equipment-scoped cloud advice after explicit opt-in and submission. Provider settings support process environment variables or a private local `.env`; failures retain retrieval-only evidence.
+- pytest coverage spans maintenance operations, imports, semantic retrieval, provider validation, fault/guided workflows, and Streamlit interactions without real model downloads or cloud requests.
+
+**Example workflow:** an engineer investigating dropped parts can search previous vacuum-gripper incidents, import the synthetic ABB robot logs, inspect the warning/failure sequence, and use Guided Troubleshooting to review the reported problem alongside scoped history and cited log evidence. Historical repairs and temporal patterns do not establish the current cause; qualified personnel must verify applicability.
+
+### Demo screenshots
+
+| Dashboard | Similar Issues |
+| --- | --- |
+| [<img src="docs/screenshots/01-dashboard.jpg" width="360" alt="Dashboard with synthetic equipment and maintenance issues">](docs/screenshots/01-dashboard.jpg) | [<img src="docs/screenshots/02-similar-issues.jpg" width="360" alt="Local semantic search results with historical ticket findings">](docs/screenshots/02-similar-issues.jpg) |
+| Synthetic equipment and maintenance issue overview. | Local semantic retrieval of historical tickets. |
+
+<details>
+<summary>Supporting examples: Fault Analysis and Guided Troubleshooting</summary>
+
+| Fault Analysis | Guided Troubleshooting |
+| --- | --- |
+| [<img src="docs/screenshots/03-fault-patterns.jpg" width="360" alt="Detected temporal fault patterns with supporting synthetic robot-log IDs">](docs/screenshots/03-fault-patterns.jpg) | [<img src="docs/screenshots/04-guided-evidence.jpg" width="360" alt="Guided troubleshooting with historical maintenance evidence and log observations">](docs/screenshots/04-guided-evidence.jpg) |
+| Deterministic patterns detected from imported synthetic robot logs. | Historical maintenance evidence and log observations. |
+
+</details>
+
+All screenshots use synthetic data. Similarity scores and temporal correlations are not verified fault diagnoses. Click an image to view it at full size.
 
 ## Run on Windows PowerShell
 
-Prerequisite: install Python 3.11 or newer with the Windows Python launcher. The commands below select Python 3.11 explicitly; use your installed version (for example `-3.12`) if needed. Replace the example path with your local checkout folder.
+Prerequisites: Git and Python 3.11 or newer with the Windows Python launcher. Run these commands from a folder where you want a new checkout. They select Python 3.11 explicitly; use your installed version (for example `-3.12`) if needed.
 
 ```powershell
-Set-Location 'C:\path\to\MaintainAI'
+git clone https://github.com/a5ura/MaintainAI.git
+Set-Location MaintainAI
 py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install "torch>=2.2,<3" --index-url https://download.pytorch.org/whl/cpu
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m scripts.seed
-.\.venv\Scripts\python.exe -m pytest -q --basetemp=./test_temp -p no:cacheprovider
+# Keep the demo database separate from any existing maintenance workspace.
+$env:MAINTAINAI_DB_PATH = Join-Path ([System.IO.Path]::GetTempPath()) ('MaintainAI-demo-' + [guid]::NewGuid().ToString('N') + '.db')
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-Open **http://localhost:8501** after the server starts. Stop it with **Ctrl+C**. The commands call the environment's Python directly, so PowerShell script activation and execution-policy changes are unnecessary. The included Streamlit configuration binds the server to this computer's loopback interface and disables Streamlit usage statistics.
+Open [http://localhost:8501](http://localhost:8501) after the server starts. Stop it with **Ctrl+C**. Activation is shown for convenience; if PowerShell blocks `Activate.ps1`, skip that line and continue with the explicit `.venv` Python commands without changing execution policy. The included Streamlit configuration binds the server to this computer's loopback interface and disables Streamlit usage statistics.
+
+The database override applies to this terminal and its Streamlit process. Keep the terminal open while demonstrating; retain the temporary database path if you want to revisit those records. Without an override, the application uses `data/maintainai.db`. Seed from the sidebar as described below, or run `.\.venv\Scripts\python.exe -m scripts.seed` before launching Streamlit in the same terminal. Tests are separate from the demo; see [Run tests on Windows](#run-tests-on-windows).
 
 The explicit PyTorch installation selects the [official CPU wheel index](https://download.pytorch.org/whl/cpu/torch/). The application also sets `device="cpu"` for model loading and encoding. Installation needs internet access and downloads larger packages than v0.1, but no CUDA toolkit or GPU is required. Running the app and using the original maintenance pages does not load or download the embedding model.
 
@@ -44,7 +68,29 @@ If `py -3.11` is unavailable and this working copy contains the optional project
 .\.tools\python\cpython-3.11-windows-x86_64-none\python.exe -m venv .venv
 ```
 
-Then run the install, seed, test, and launch commands above. The `.tools` directory is a local development convenience and is ignored by Git. A fresh clone does not include this interpreter; install Python 3.11+ as described in the prerequisite.
+Then run the install and launch commands above, and seed through the demo walkthrough below. The `.tools` directory is a local development convenience and is ignored by Git. A fresh clone does not include this interpreter; install Python 3.11+ as described in the prerequisites.
+
+### Local demo walkthrough: no cloud key
+
+Use the sidebar's **Navigate** control to move between pages. Keep cloud consent unchecked throughout this walkthrough.
+
+| Step | Action | What to inspect |
+| --- | --- | --- |
+| 1. Seed | Click **Load synthetic demo data**, then open **Dashboard**. | A fresh database has **5 equipment / 20 issues / 3 open / 17 closed**. Loading again adds no duplicates. |
+| 2. Track a ticket | Open **Home → Create a Ticket** (or **Create issue**). Select the conveyor, enter a synthetic problem description and reporter, then click **Create issue**. Under **Issues**, select it, fill the findings, change its status to **Closed**, and click **Save issue updates**. | The ticket and findings appear in **Equipment history**. With this one new closed ticket, totals become **21 issues / 3 open / 18 closed**. |
+| 3. Retrieve history | Open **Similar Issues → Rebuild / refresh search index**. Search `Vacuum gripper loses suction and drops parts during transfer` using **Find similar issues**. | Inspect historical issue IDs, descriptions, findings, and similarity scores. Refresh the index after ticket changes. |
+| 4. Import robot logs | Open **Equipment Logs**, choose [sample_data/abb_robot_logs.csv](sample_data/abb_robot_logs.csv), and click **Import logs** once. | The file adds **7 events** associated with **DEMO-ABB-001**. Seeding does not import these logs; repeating the import appends duplicates. |
+| 5. Inspect patterns | Open **Fault Analysis**, select **DEMO-ABB-001**, and click **Analyze Logs**. | The sample contains **2 temporal findings**: warning-to-error and repeated failures, with supporting source log IDs. These are observations, not diagnoses. |
+| 6. Combine evidence | Open **Home → Troubleshoot a Problem** (or **Guided Troubleshooting**). Select **DEMO-ABB-001**, enter `Vacuum gripper loses suction during robot pick and place`, then click **Analyze Problem → Analyze Stored Logs → Find Similar Maintenance Issues**. | Review equipment-scoped history, log observations, temporal findings, and **Exact provider messages**. Keep consent unchecked; no cloud generation occurs. |
+| 7. Try description-only retrieval | In Guided Troubleshooting, choose **No equipment selected**, submit a problem with **Analyze Problem**, then click **Find Similar Maintenance Issues**. | Global historical matches are available without log analysis or a cloud key. |
+
+The first index rebuild may download the public MiniLM model. Guided retrieval uses cached weights only; prepare the index under Similar Issues first. Once the model is cached, use the [offline setting](#first-model-download-and-offline-use) to prevent model-network access. Cloud setup is optional and is not part of this walkthrough.
+
+### Verified demonstration checkpoint
+
+On October 27, 2026, Step 55B used an unchanged application copy and an isolated synthetic database with existing dependencies and an already cached MiniLM model offline. Service checks verified seeding, ticket creation/update/persistence, actual local embeddings, 7 imported robot logs, and 2 fault patterns. Streamlit started on loopback, and AppTest exercised all 12 pages plus guided retrieval, evidence provenance, preview citation allowlists, and stale-index recovery.
+
+This was runtime verification in the existing environment, not a fresh-install check, manual browser acceptance, a full regression run, or live cloud validation. No cloud requests or model downloads were made. Generated-answer citation behavior was not exercised in that run.
 
 ## Run tests on Windows
 
@@ -69,6 +115,12 @@ From the project folder, after installing the requirements:
 All timestamps are stored and displayed in UTC. `created_at` stays fixed when an issue is edited; `updated_at` changes on each save. Status changes are unrestricted, allowing an issue to be reopened. Notes are current editable fields, not an append-only audit log. At the service level, a status-only update preserves existing findings; explicitly passing empty text clears a field.
 
 Equipment CRUD remains **partial**: registration, listing, viewing, and condition updates are implemented. Editing other equipment fields and deleting equipment are not implemented in this version.
+
+## Equipment logs and fault analysis
+
+**Equipment Logs** accepts UTF-8 CSV files for already registered equipment. Required columns are `equipment_asset_tag`, `timestamp`, `severity`, and `message`; optional columns are `event_code` and `source`. Timestamps must include a timezone and are normalized to UTC. Severities are `INFO`, `WARNING`, `ERROR`, and `CRITICAL`. Imports are atomic, append-only operations with the same 5 MiB / 10,000-row limits as equipment/issue imports. They do not create equipment. Browse stored events by equipment and severity, newest first.
+
+**Fault Analysis → Analyze Logs** explicitly examines stored events. It detects repeated ERROR/CRITICAL events with the same equipment and event code whose adjacent failures are at most five minutes apart, and a WARNING strictly preceding an ERROR/CRITICAL event for the same equipment by at most two minutes. Overlapping matches sharing evidence are coalesced per rule, so an episode can span longer than one window. Findings retain source log IDs; related historical maintenance issues can be retrieved separately. These patterns do not establish causation or equipment health, and the application does not continuously monitor live telemetry.
 
 ## Guided Troubleshooting
 
@@ -242,6 +294,8 @@ You can also seed a specific path with `python -m scripts.seed --db data/another
 
 Use **CSV import** in the app. Download an example there, or use the files in `sample_data/`. These are synthetic examples with exact headers. Import `equipment.csv` before `issues.csv` into an empty database. If you already seeded, the sample equipment tags already exist and reimporting them will produce duplicate-tag errors.
 
+Robot-event CSVs use the separate **Equipment Logs** page and the [log schema described above](#equipment-logs-and-fault-analysis).
+
 | Type | Required columns | Optional columns |
 | --- | --- | --- |
 | Equipment | `asset_tag`, `name`, `category` | `manufacturer`, `model`, `location`, `operational_status`, `created_at` |
@@ -259,6 +313,8 @@ Use **CSV import** in the app. Download an example there, or use the files in `s
 
 ## Architecture
 
+Streamlit pages call independent Python maintenance services backed by SQLite. Equipment, issue, and log imports pass through validation before transactional insertion. Local sentence embeddings and cosine retrieval provide historical evidence; deterministic fault analysis provides temporal findings. Standalone, fault, and guided flows can prepare bounded evidence for optional cloud generation after their explicit consent/submission steps. The guided flow previews exact provider messages; generated output is advisory and never executes maintenance actions or changes records.
+
 ```text
 MaintainAI/
 ├── app.py                    # Streamlit entry point and connection lifecycle
@@ -266,17 +322,28 @@ MaintainAI/
 │   ├── database.py            # Schema, SQLite connections, configurable DB path
 │   ├── service.py             # Validation, registry, issues, filters, statistics
 │   ├── csv_import.py          # CSV parsing, row errors, atomic batch import
+│   ├── log_import.py          # Equipment-event CSV validation and ingestion
+│   ├── log_ui.py              # Log import, browsing, and filters
 │   ├── seed.py                # Repeatable synthetic demo loading
 │   ├── embeddings.py          # Lazy CPU MiniLM adapter and embedder protocol
 │   ├── semantic_search.py     # SQLite vector index, freshness, cosine retrieval
 │   ├── semantic_ui.py         # Similar Issues page
 │   ├── llm.py                 # Optional HTTP provider interface, config, test double
+│   ├── llm_ui.py              # Local configuration status; no provider request
 │   ├── rag.py                 # Grounded prompts, citation validation, advisory service
 │   ├── rag_ui.py              # AI Troubleshooting Assistant page
+│   ├── fault_detection.py     # Deterministic temporal patterns and source log IDs
+│   ├── fault_matching.py      # Historical issue retrieval from log findings
+│   ├── fault_ui.py            # Fault analysis and historical evidence display
+│   ├── fault_rag.py           # Log-aware evidence and shared response validation
+│   ├── fault_rag_ui.py        # Optional fault advice with evidence-bound consent
+│   ├── guided_matching.py     # Technician-description and log-evidence queries
+│   ├── guided_rag.py          # Bounded evidence, provenance, and exact messages
+│   ├── guided_ui.py           # Guided session, freshness checks, and consent
 │   └── ui.py                  # Streamlit pages and pandas tables/charts
 ├── scripts/seed.py            # Seed CLI
-├── sample_data/               # Synthetic equipment and issue CSVs
-├── tests/                    # Core, CSV, and Streamlit interaction tests
+├── sample_data/               # Synthetic equipment, issue, and ABB robot-log CSVs
+├── tests/                     # Maintenance, retrieval, fault/guided, and UI tests
 ├── data/                     # Generated SQLite files (ignored)
 ├── requirements.txt
 └── pyproject.toml            # Python requirement and pytest configuration
@@ -293,6 +360,8 @@ The `.gitignore` excludes virtual environments, downloaded local tools, SQLite f
 ## Scope
 
 This is a local portfolio prototype without authentication, role permissions, attachments, a general migration framework, an audit trail, or production deployment hardening. Concurrent edits use last-write-wins behavior. Do not expose a shared deployment to untrusted users without adding access control. v0.2A provides local embeddings/retrieval; v0.2B adds optional, explicitly enabled cloud RAG generation. Retrieval-only mode does not send tickets to an inference provider. No agents, MCP, autonomous tools, or machine-control integration are implemented. Model-file checks/downloads can be disabled after caching; optional cloud mode requires network access to the configured endpoint.
+
+Live robot telemetry monitoring, continuous ROS integration, automatic real-time incident creation, and autonomous repair are not implemented. General equipment editing/deletion, richer audit history, and production deployment controls would require future development; they are outside the current local prototype's implemented scope.
 
 ## License
 
